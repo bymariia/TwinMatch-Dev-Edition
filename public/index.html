@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TwinMatch // Dev Edition</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/devicon.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <script src="/socket.io/socket.io.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+
+    :root {
+      --bg-dark: #0f172a;
+      --glass: rgba(30, 41, 59, 0.7);
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg-dark);
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(79, 70, 229, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(245, 158, 11, 0.1) 0%, transparent 50%),
+        url("https://www.transparenttextures.com/patterns/carbon-fibre.png");
+      background-attachment: fixed;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Efeito de Vidro (Glassmorphism) */
+    .glass-panel {
+      background: var(--glass);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    /* Animações de Cartas */
+    .perspective {
+      perspective: 1000px;
+    }
+
+    .flip-card-inner {
+      transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+      transform-style: preserve-3d;
+    }
+
+    .card-flipped {
+      transform: rotateY(180deg);
+    }
+
+    .backface-hidden {
+      backface-visibility: hidden;
+    }
+
+    @keyframes fadeInScale {
+      0% {
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+      }
+
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    .animate-card {
+      animation: fadeInScale 0.5s forwards;
+      opacity: 0;
+    }
+
+    /* Animações de Celebração (Vitória) */
+    @keyframes float {
+
+      0%,
+      100% {
+        transform: translateY(0) scale(1);
+      }
+
+      50% {
+        transform: translateY(-10px) scale(1.05);
+      }
+    }
+
+    .animate-float {
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes pulseGlow {
+
+      0%,
+      100% {
+        box-shadow: 0 0 20px rgba(234, 179, 8, 0.2);
+      }
+
+      50% {
+        box-shadow: 0 0 40px rgba(234, 179, 8, 0.5);
+        border-color: rgba(234, 179, 8, 0.6);
+      }
+    }
+
+    .victory-glow {
+      animation: pulseGlow 2.5s infinite;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+
+<body class="text-slate-200 min-h-screen flex flex-col antialiased">
+
+  <header class="p-6 text-center z-40">
+    <div
+      class="inline-flex items-center gap-3 bg-slate-800/50 px-6 py-2 rounded-full border border-white/5 backdrop-blur-md">
+      <div class="bg-indigo-500 p-2 rounded-lg shadow-[0_0_15px_rgba(99,102,241,0.5)]">
+        <i class="fas fa-layer-group text-white text-xl"></i>
+      </div>
+      <h1 class="text-4xl font-extrabold tracking-tighter text-white">Twin<span class="text-indigo-400">Match</span>
+      </h1>
+      <span class="text-[10px] font-mono bg-slate-700 text-slate-400 px-2 py-1 rounded">v2.1.0</span>
+    </div>
+    <p class="text-xs text-slate-500 mt-2 font-mono uppercase tracking-[0.2em]">Developer Memory Challenge</p>
+  </header>
+
+  <main class="flex-grow flex items-center justify-center p-4 relative">
+
+    <div id="painel-inicial"
+      class="glass-panel p-8 rounded-3xl max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-10">
+
+      <div class="space-y-6">
+        <h3 class="text-indigo-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2">
+          <i class="fas fa-terminal"></i> // DOCUMENTAÇÃO DO JOGO
+        </h3>
+
+        <div class="space-y-4">
+          <div class="flex gap-4 items-start">
+            <div
+              class="bg-indigo-500/10 p-2 rounded-lg text-indigo-400 w-9 h-9 flex items-center justify-center shrink-0">
+              <i class="fas fa-user-group"></i>
+            </div>
+            <div>
+              <h4 class="text-sm font-bold text-white">Modo Multiplayer</h4>
+              <p class="text-xs text-slate-400 leading-relaxed">Duelo 1v1 online. Ambos devem confirmar prontidão para
+                sincronizar o ambiente do tabuleiro.</p>
+            </div>
+          </div>
+          <div class="flex gap-4 items-start">
+            <div
+              class="bg-amber-500/10 p-2 rounded-lg text-amber-400 w-9 h-9 flex items-center justify-center shrink-0">
+              <i class="fas fa-bolt"></i>
+            </div>
+            <div>
+              <h4 class="text-sm font-bold text-white">Velocidade é Código</h4>
+              <p class="text-xs text-slate-400 leading-relaxed">Em caso de empate nos pares ao final do deck, o vencedor
+                é definido pelos critérios do motor do jogo.</p>
+            </div>
+          </div>
+          <div class="flex gap-4 items-start">
+            <div
+              class="bg-emerald-500/10 p-2 rounded-lg text-emerald-400 w-9 h-9 flex items-center justify-center shrink-0">
+              <i class="fas fa-code"></i>
+            </div>
+            <div>
+              <h4 class="text-sm font-bold text-white">Stack de Cartas</h4>
+              <p class="text-xs text-slate-400 leading-relaxed">Encontre as 12 principais tecnologias do ecossistema
+                moderno de desenvolvimento de software.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col justify-center gap-6 bg-white/5 p-6 rounded-2xl border border-white/5">
+        <div class="space-y-4">
+          <h3 class="text-slate-300 font-bold uppercase tracking-widest text-xs">// AUTENTICAÇÃO VIA NETWORK</h3>
+
+          <div class="space-y-3">
+            <div id="slot-p1"
+              class="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5 group transition-all">
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">
+                  1</div>
+                <span id="p1-nome" class="font-mono text-sm font-bold">Aguardando...</span>
+              </div>
+              <button id="btn-ready-p1"
+                class="opacity-40 cursor-not-allowed bg-slate-700 text-[10px] px-3 py-1 rounded-full uppercase font-bold text-white transition-all"
+                disabled>Ready</button>
+            </div>
+
+            <div id="slot-p2"
+              class="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5 group transition-all">
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 font-bold">
+                  2</div>
+                <span id="p2-nome" class="font-mono text-sm font-bold">Aguardando...</span>
+              </div>
+              <button id="btn-ready-p2"
+                class="opacity-40 cursor-not-allowed bg-slate-700 text-[10px] px-3 py-1 rounded-full uppercase font-bold text-white transition-all"
+                disabled>Ready</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-white/5 flex gap-2">
+          <input type="text" id="input-apelido" placeholder="User nickname"
+            class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-grow focus:outline-none focus:border-indigo-500 text-white font-mono transition-all">
+          <button id="btn-entrar"
+            class="bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-lg shadow-indigo-500/20">Login</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="painel-tabuleiro" class="hidden w-full max-w-7xl mx-auto grid grid-cols-12 gap-6 relative">
+
+      <div class="col-span-12 lg:col-span-3 space-y-4">
+        <div class="glass-panel p-5 rounded-3xl border border-white/10 space-y-4">
+          <div class="flex items-center gap-2 mb-2">
+            <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Room Match
+              Connected</span>
+          </div>
+
+          <div class="space-y-3">
+            <div id="placar-p1" class="p-4 rounded-2xl bg-slate-900/40 border border-white/5 transition-all">
+              <div class="flex justify-between items-center mb-1">
+                <p class="text-[10px] font-bold text-indigo-400 uppercase font-mono" id="txt-placar-p1">P1</p>
+                <i class="fas fa-circle-user text-indigo-400/50"></i>
+              </div>
+              <p class="text-2xl font-bold text-white" id="pontos-p1">0</p>
+            </div>
+
+            <div id="placar-p2" class="p-4 rounded-2xl bg-slate-900/40 border border-white/5 transition-all">
+              <div class="flex justify-between items-center mb-1">
+                <p class="text-[10px] font-bold text-purple-400 uppercase font-mono" id="txt-placar-p2">P2</p>
+                <i class="fas fa-circle-user text-purple-400/50"></i>
+              </div>
+              <p class="text-2xl font-bold text-white" id="pontos-p2">0</p>
+            </div>
+          </div>
+
+          <div
+            class="p-4 bg-indigo-600/10 rounded-2xl border border-indigo-500/20 text-center flex flex-col items-center">
+            <p class="text-[9px] text-indigo-300 uppercase font-mono tracking-tighter mb-1">Turno Atual</p>
+            <p class="text-lg font-bold text-white truncate mb-2" id="turno-jogador">---</p>
+            <div
+              class="inline-flex items-center gap-2 bg-slate-900/80 px-3 py-1 rounded-full border border-indigo-500/30 shadow-inner w-fit">
+              <i class="fas fa-stopwatch text-indigo-400 text-[10px] animate-pulse"></i>
+              <span class="text-xs font-mono font-bold text-indigo-100 tracking-wider" id="tempo-turno">00:00</span>
+            </div>
+          </div>
+
+          <button id="btn-abandonar"
+            class="w-full py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-red-500/20">
+            <i class="fas fa-flag-checkered mr-2"></i> Abandon Match
+          </button>
+        </div>
+
+        <div class="glass-panel p-4 rounded-3xl h-60 flex flex-col">
+          <span class="text-[9px] font-mono text-slate-500 uppercase mb-2 ml-1">Reactions Console</span>
+          <div id="historico-chat"
+            class="flex-grow overflow-y-auto space-y-1 p-3 bg-slate-950/50 rounded-2xl text-[10px] font-mono text-emerald-400/80 mb-3 border border-white/5">
+          </div>
+          <div class="grid grid-cols-4 gap-2">
+            <button
+              class="btn-emoji bg-slate-800/50 hover:bg-indigo-600 p-2 rounded-xl text-lg transition-all">😎</button>
+            <button
+              class="btn-emoji bg-slate-800/50 hover:bg-indigo-600 p-2 rounded-xl text-lg transition-all">🤡</button>
+            <button
+              class="btn-emoji bg-slate-800/50 hover:bg-indigo-600 p-2 rounded-xl text-lg transition-all">🤯</button>
+            <button
+              class="btn-emoji bg-slate-800/50 hover:bg-indigo-600 p-2 rounded-xl text-lg transition-all">🔥</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="grid-cartas" class="col-span-12 lg:col-span-9 grid grid-cols-4 sm:grid-cols-6 gap-4 items-center"></div>
+    </div>
+  </main>
+
+  <div id="modal-confirmar-abandono"
+    class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
+    <div
+      class="glass-panel p-8 rounded-3xl border-red-500/50 max-w-xs w-full text-center shadow-[0_20px_50px_rgba(239,68,68,0.2)]">
+      <div
+        class="bg-red-500/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500 text-2xl">
+        <i class="fas fa-exclamation-triangle"></i>
+      </div>
+      <h3 class="text-xl font-extrabold text-white">Abandonar?</h3>
+      <p class="text-xs text-slate-400 font-mono my-4 leading-relaxed">
+        Sua instância de conexão será fechada e a vitória será computada para o adversário por W.O.
+      </p>
+      <div class="flex flex-col gap-2">
+        <button id="btn-confirmar-abandono"
+          class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl text-xs uppercase transition-all">Confirmar
+          Saída</button>
+        <button id="btn-cancelar-abandono"
+          class="w-full bg-slate-700 text-slate-300 font-bold py-3 rounded-xl text-xs uppercase transition-all">Voltar
+          ao Jogo</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-fim"
+    class="hidden fixed inset-0 bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4 z-50">
+    <div
+      class="glass-panel victory-glow p-10 rounded-[35px] border border-amber-500/30 max-w-md w-full text-center relative overflow-hidden shadow-[0_0_50px_rgba(234,179,8,0.15)] flex flex-col">
+
+      <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-amber-400 via-indigo-500 to-emerald-400">
+      </div>
+
+      <div>
+        <div
+          class="animate-float inline-flex bg-gradient-to-b from-amber-400 to-amber-600 p-5 rounded-3xl shadow-[0_10px_30px_rgba(245,158,11,0.4)] text-slate-950 text-4xl mb-6">
+          <i class="fas fa-trophy"></i>
+        </div>
+      </div>
+
+      <h2 class="text-3xl font-extrabold text-white tracking-tighter uppercase" id="modal-titulo">VICTORY_DECLARED</h2>
+      <p class="text-[10px] text-amber-400 font-mono tracking-widest mt-1 uppercase">Sessão Finalizada com Sucesso</p>
+
+      <div class="my-6 space-y-3">
+        <div class="p-4 bg-slate-900/80 rounded-2xl border border-white/5 text-left font-mono space-y-2">
+          <div class="flex justify-between items-center bg-white/[0.02] p-2 rounded-lg">
+            <span class="text-xs font-bold text-indigo-400" id="res-p1-label">Dev_01</span>
+            <div class="text-right">
+              <span class="block text-xs font-bold text-white tracking-wide" id="res-p1-val">0 pares</span>
+              <span class="block text-[9px] text-slate-400 font-mono mt-0.5" id="res-p1-tempo">0s acumulados</span>
+            </div>
+          </div>
+          <div class="flex justify-between items-center bg-white/[0.02] p-2 rounded-lg">
+            <span class="text-xs font-bold text-purple-400" id="res-p2-label">Dev_02</span>
+            <div class="text-right">
+              <span class="block text-xs font-bold text-white tracking-wide" id="res-p2-val">0 pares</span>
+              <span class="block text-[9px] text-slate-400 font-mono mt-0.5" id="res-p2-tempo">0s acumulados</span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="p-5 bg-gradient-to-r from-indigo-950/80 via-slate-900/90 to-purple-950/80 rounded-2xl border border-white/10 shadow-inner">
+          <p class="text-[9px] font-mono text-slate-400 uppercase tracking-widest mb-1">👑 COGNITIVE CHAMPION 👑</p>
+          <p class="text-2xl font-black bg-gradient-to-r from-amber-300 via-white to-amber-400 bg-clip-text text-transparent uppercase tracking-tight drop-shadow-md"
+            id="res-vencedor">---</p>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-2 w-full">
+        <button id="btn-nova-partida"
+          class="flex-grow bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-95 text-white font-extrabold py-4 rounded-2xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/20">
+          <i class="fas fa-play mr-1.5"></i> Rematch
+        </button>
+        <button id="btn-sair"
+          class="flex-grow bg-slate-800 hover:bg-red-600 active:scale-95 text-slate-300 hover:text-white font-extrabold py-4 rounded-2xl text-xs uppercase tracking-wider transition-all border border-white/5 hover:border-red-500/50">
+          <i class="fas fa-sign-out-alt mr-1.5"></i> Exit Game
+        </button>
+      </div>
+
+    </div>
+  </div>
+  <script type="module" src="./app.js"></script>
+</body>
+
+</html>
