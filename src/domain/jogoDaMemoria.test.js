@@ -4,7 +4,7 @@ describe('Jogo da Memória Dev (Lógica Real-Time)', () => {
   let linguagensExemplo;
 
   beforeEach(() => {
-    // Lista Oficial do seu BRD: 12 Pares (24 Cartas no total)
+    // Mock inicializado com 12 pares (24 cartas)
     linguagensExemplo = [
       'JavaScript', 'Python', 'Java', 'C#', 
       'HTML5', 'CSS3', 'React', 'Node.js', 
@@ -70,8 +70,7 @@ describe('Jogo da Memória Dev (Lógica Real-Time)', () => {
 
     const cartas = jogo.obterCartas();
     
-    // Na lista não embaralhada de 12 itens duplicados:
-    // Índice 0 é 'JavaScript' e Índice 1 é 'Python'. São diferentes!
+    // Simulação de erro com cartas diferentes (Índices não embaralhados)
     const indiceCard1 = 0;
     const indiceCard2 = 1;
 
@@ -97,7 +96,7 @@ describe('Jogo da Memória Dev (Lógica Real-Time)', () => {
 
     const cartas = jogo.obterCartas();
     
-    // Índice 0 é 'JavaScript' e Índice 12 é 'JavaScript' (o par duplicado)
+    // Simulação de acerto de par exato
     const indiceCard1 = 0;
     const indiceCard2 = 12;
 
@@ -128,7 +127,7 @@ describe('Jogo da Memória Dev (Lógica Real-Time)', () => {
     expect(jogo.obterVencedor()).toBe('Player1');
   });
 
-  // ================= TESTES DE REGRAS DE NEGÓCIO (BRD) ================= //
+  // ================= TESTES DE REGRAS DE NEGÓCIO ================= //
 
   test('TDD - RF01: não deve iniciar o jogo até que ambos os jogadores deem Start (fiquem prontos)', () => {
     const jogo = new JogoDaMemoria(linguagensExemplo);
@@ -145,8 +144,7 @@ describe('Jogo da Memória Dev (Lógica Real-Time)', () => {
   });
 
   test('TDD - RF14: em caso de empate de pontos, deve vencer o jogador com menor tempo acumulado', () => {
-    // 4 linguagens geram 8 cartas: ['JS', 'Python', 'Java', 'C#', 'JS', 'Python', 'Java', 'C#']
-    // Índices dos pares: JS(0,4), Python(1,5), Java(2,6), C#(3,7)
+    // Mapeamento de pares: JS(0,4), Python(1,5), Java(2,6), C#(3,7)
     const jogo = new JogoDaMemoria(['JavaScript', 'Python', 'Java', 'C#']);
     jogo.adicionarJogador('Player1');
     jogo.adicionarJogador('Player2');
@@ -154,32 +152,32 @@ describe('Jogo da Memória Dev (Lógica Real-Time)', () => {
     jogo.definirPronto('Player2');
     jogo.iniciar(false);
 
-    jogo.registrarTempoTurno('Player1', 20); // Mais lento
-    jogo.registrarTempoTurno('Player2', 10); // Mais rápido
+    // Registro simulado de métricas de tempo
+    jogo.registrarTempoTurno('Player1', 20);
+    jogo.registrarTempoTurno('Player2', 10);
 
-    // Player 1 faz 2 pares: JavaScript(0,4) e Python(1,5) -> Placar P1 = 2
+    // Player 1 acerta dois pares
     jogo.virarCarta('Player1', 0);
     jogo.virarCarta('Player1', 4);
     jogo.virarCarta('Player1', 1);
     jogo.virarCarta('Player1', 5);
 
-    // Player 1 erra de propósito com Java(2) e C#(3) para passar o turno!
+    // Player 1 executa erro intencional para alternância de turno
     jogo.virarCarta('Player1', 2);
     jogo.virarCarta('Player1', 3);
-    jogo.finalizarTurnoSeIncorreto(); // Vez do Player 2!
+    jogo.finalizarTurnoSeIncorreto(); 
 
-    // Player 2 faz os 2 pares restantes: Java(2,6) e C#(3,7) -> Placar P2 = 2
+    // Player 2 acerta dois pares finais
     jogo.virarCarta('Player2', 2);
     jogo.virarCarta('Player2', 6);
     jogo.virarCarta('Player2', 3);
     jogo.virarCarta('Player2', 7);
 
-    // Validações
     expect(jogo.obterStatus()).toBe(StatusJogo.FINALIZADO);
     expect(jogo.obterPontuacao('Player1')).toBe(2);
     expect(jogo.obterPontuacao('Player2')).toBe(2);
     
-    // O desempate deve coroar o Player 2 por ser mais rápido
+    // Valida desempate com base no menor tempo acumulado
     expect(jogo.obterVencedor()).toBe('Player2');
   });
 

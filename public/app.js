@@ -1,11 +1,15 @@
-// Conexão automática com o servidor backend
+// ==========================================================================
+// MÓDULO CLIENTE // ENGINE DE INTERAÇÃO FRONTEND E WEBSOCKET
+// ==========================================================================
+
 const socket = io();
 
+// --- STATE MANAGEMENT LOCAL ---
 let meuApelido = null;
 let estadoLocal = {};
 let travadoParaClique = false;
 
-// --- SELEÇÃO DE ELEMENTOS DO DOM ---
+// --- DOM ELEMENTS SELECTION ---
 const painelInicial = document.getElementById('painel-inicial');
 const painelTabuleiro = document.getElementById('painel-tabuleiro');
 const gridCartas = document.getElementById('grid-cartas');
@@ -18,16 +22,16 @@ const btnReadyP2 = document.getElementById('btn-ready-p2');
 const pontosP1 = document.getElementById('pontos-p1');
 const pontosP2 = document.getElementById('pontos-p2');
 const turnoJogador = document.getElementById('turno-jogador');
-const tempoTurno = document.getElementById('tempo-turno'); // <-- CRONÔMETRO AQUI
+const tempoTurno = document.getElementById('tempo-turno');
 const historicoChat = document.getElementById('historico-chat');
 const btnAbandonar = document.getElementById('btn-abandonar');
 const placarP1 = document.getElementById('placar-p1');
 const placarP2 = document.getElementById('placar-p2');
 
+// Modais
 const modalConfirmarAbandono = document.getElementById('modal-confirmar-abandono');
 const btnConfirmarAbandono = document.getElementById('btn-confirmar-abandono');
 const btnCancelarAbandono = document.getElementById('btn-cancelar-abandono');
-
 const modalFim = document.getElementById('modal-fim');
 const modalTitulo = document.getElementById('modal-titulo');
 const resP1Val = document.getElementById('res-p1-val');
@@ -38,6 +42,7 @@ const resVencedor = document.getElementById('res-vencedor');
 const btnNovaPartida = document.getElementById('btn-nova-partida');
 const btnSair = document.getElementById('btn-sair');
 
+// Dicionário de Assets
 const dicionarioIcones = {
   'JavaScript': 'devicon-javascript-plain colored', 'Python': 'devicon-python-plain colored',
   'Java': 'devicon-java-plain colored', 'C#': 'devicon-csharp-plain colored',
@@ -47,7 +52,10 @@ const dicionarioIcones = {
   'Docker': 'devicon-docker-plain colored', 'Linux': 'devicon-linux-plain colored'
 };
 
-// --- ENVIO DE EVENTOS PARA O SERVIDOR ---
+// ==========================================================================
+// EVENTOS DE INTERAÇÃO DO USUÁRIO (EMITTERS)
+// ==========================================================================
+
 btnEntrar.addEventListener('click', () => {
   const apelido = inputApelido.value.trim();
   if (!apelido) return;
@@ -74,30 +82,28 @@ btnAbandonar.addEventListener('click', () => {
   modalConfirmarAbandono.classList.remove('hidden');
 });
 
-btnCancelarAbandono.addEventListener('click', () => modalConfirmarAbandono.classList.add('hidden'));
+btnCancelarAbandono.addEventListener('click', () => {
+  modalConfirmarAbandono.classList.add('hidden');
+});
 
 btnConfirmarAbandono.addEventListener('click', () => {
   modalConfirmarAbandono.classList.add('hidden');
   socket.emit('abandonar_partida', meuApelido);
 });
 
-// O botão Sair continua reiniciando a página (isso está correto)
 btnSair.addEventListener('click', () => location.reload());
 
-// MODIFICAÇÃO AQUI: O botão Rematch agora fala com o servidor
 btnNovaPartida.addEventListener('click', () => {
-  // 1. Envia o sinal de revanche para o servidor
   socket.emit('solicitar_rematch', meuApelido);
-
-  // 2. Muda o visual do botão para indicar que está esperando o outro jogador
   btnNovaPartida.textContent = 'AGUARDANDO RIVAL...';
   btnNovaPartida.disabled = true;
   btnNovaPartida.className = "flex-grow bg-slate-700 text-slate-400 font-extrabold py-4 rounded-2xl text-xs uppercase tracking-wider cursor-not-allowed";
 });
 
-// --- ESCUTANDO DO SERVIDOR EM TEMPO REAL ---
+// ==========================================================================
+// WEBSOCKET LISTENERS (HANDLERS)
+// ==========================================================================
 
-// RECEBE E FORMATA O TEMPO DO CRONÔMETRO
 socket.on('tick_relogio', (segundosTotais) => {
   if (!tempoTurno) return;
   const minutos = Math.floor(segundosTotais / 60).toString().padStart(2, '0');
@@ -109,12 +115,12 @@ socket.on('estado_atualizado', (estadoServer) => {
   const primeiroCarregamento = Object.keys(estadoLocal).length === 0;
   estadoLocal = estadoServer;
 
-  // Atualiza painel de autenticação inicial
+  // Renderização do Lobby
   const j = estadoServer.jogadores;
   p1Nome.textContent = j[0] || 'Aguardando...';
   p2Nome.textContent = j[1] || 'Aguardando...';
 
-  // Gerenciar botões de Ready sem sobrescrever o clique recente
+  // Gerenciamento de Estado dos Botões "Ready"
   if (j[0]) {
     if (j[0] === meuApelido) {
       if (btnReadyP1.textContent !== 'AGUARDANDO RIVAL...') {
@@ -126,6 +132,7 @@ socket.on('estado_atualizado', (estadoServer) => {
       btnReadyP1.className = "bg-slate-700 text-[10px] px-3 py-1 rounded-full text-slate-500 cursor-not-allowed";
     }
   }
+
   if (j[1]) {
     if (j[1] === meuApelido) {
       if (btnReadyP2.textContent !== 'AGUARDANDO RIVAL...') {
@@ -138,15 +145,12 @@ socket.on('estado_atualizado', (estadoServer) => {
     }
   }
 
-  // Se o jogo começou (ou foi reiniciado), alterna os painéis
+  // Transição para o Tabuleiro (Gameplay)
   if (estadoServer.status === 'EM_ANDAMENTO') {
     painelInicial.classList.add('hidden');
     painelTabuleiro.classList.remove('hidden');
-    
-    // 1. Esconde o modal de fim de jogo que estava aberto
     modalFim.classList.add('hidden'); 
 
-    // 2. Restaura o botão de Rematch para o estado e design original verde-esmeralda
     btnNovaPartida.disabled = false;
     btnNovaPartida.innerHTML = `<i class="fas fa-play mr-1.5"></i> Rematch`;
     btnNovaPartida.className = "flex-grow bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-95 text-white font-extrabold py-4 rounded-2xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/20";
@@ -154,7 +158,7 @@ socket.on('estado_atualizado', (estadoServer) => {
     renderizarTabuleiro(primeiroCarregamento);
   }
 
-  // Se o jogo terminou normalmente
+  // Fim de Jogo Natural
   if (estadoServer.status === 'FINALIZADO') {
     exibirModalFimNormal(estadoServer);
   }
@@ -173,7 +177,10 @@ socket.on('partida_encerrada_wo', (vencedorPorWO) => {
 
 socket.on('erro_sistema', (msg) => alert(msg));
 
-// --- RENDERIZAÇÃO DA INTERFACE ---
+// ==========================================================================
+// ENGINE DE RENDERIZAÇÃO E CORE UI
+// ==========================================================================
+
 function renderizarTabuleiro(forçarCascata) {
   const j = estadoLocal.jogadores;
   document.getElementById('txt-placar-p1').textContent = j[0] || 'P1';
@@ -183,6 +190,7 @@ function renderizarTabuleiro(forçarCascata) {
   pontosP2.textContent = estadoLocal.pontuacoes[j[1]] || 0;
   turnoJogador.textContent = estadoLocal.turnoAtual || '---';
 
+  // Indicação visual de turno ativo
   if (estadoLocal.turnoAtual === j[0]) {
     placarP1.className = "p-4 rounded-2xl bg-slate-800 border border-indigo-500/50 shadow-[0_0_20px_rgba(99,102,241,0.2)] transition-all opacity-100";
     placarP2.className = "p-4 rounded-2xl bg-slate-900/40 border border-white/5 transition-all opacity-40 scale-95";
@@ -192,9 +200,12 @@ function renderizarTabuleiro(forçarCascata) {
   }
 
   gridCartas.innerHTML = '';
+  
+  // Renderização Dinâmica do Deck
   estadoLocal.cartas.forEach((carta, index) => {
     const cardElement = document.createElement('div');
     cardElement.className = 'perspective h-28 sm:h-32 cursor-pointer select-none';
+    
     if (forçarCascata) {
       cardElement.classList.add('animate-card');
       cardElement.style.animationDelay = `${index * 0.04}s`;
@@ -227,9 +238,9 @@ function renderizarTabuleiro(forçarCascata) {
         logNoConsole('SYS', 'Calma dev, não é o seu turno!');
         return;
       }
-
       socket.emit('virar_carta', { jogador: meuApelido, index });
     });
+
     gridCartas.appendChild(cardElement);
   });
 }
@@ -237,19 +248,17 @@ function renderizarTabuleiro(forçarCascata) {
 function exibirModalFimNormal(estadoServer) {
   const j = estadoServer.jogadores;
 
-  // Nomes e Pontuação de Pares
+  // Processamento de Resultados
   resP1Label.textContent = j[0];
   resP2Label.textContent = j[1];
   resP1Val.textContent = `${estadoServer.pontuacoes[j[0]]} pares`;
   resP2Val.textContent = `${estadoServer.pontuacoes[j[1]]} pares`;
 
-  // Tempos Acumulados
   const tempoP1 = estadoServer.tempos[j[0]] || 0;
   const tempoP2 = estadoServer.tempos[j[1]] || 0;
   document.getElementById('res-p1-tempo').textContent = `${tempoP1}s acumulados`;
   document.getElementById('res-p2-tempo').textContent = `${tempoP2}s acumulados`;
 
-  // Declaração do Vencedor
   modalTitulo.textContent = "VICTORY_DECLARED";
   btnNovaPartida.classList.remove('hidden');
   resVencedor.textContent = estadoServer.vencedor === 'Empate' ? "DRAW GAME!" : estadoServer.vencedor;
@@ -257,7 +266,10 @@ function exibirModalFimNormal(estadoServer) {
   modalFim.classList.remove('hidden');
 }
 
-// --- CONSOLE DE REAÇÕES INTERATIVAS ---
+// ==========================================================================
+// CONSOLE DE REAÇÕES INTERATIVAS
+// ==========================================================================
+
 function logNoConsole(autor, msg) {
   const div = document.createElement('div');
   div.innerHTML = `<span class="text-indigo-400">[${autor}]</span> ${msg}`;

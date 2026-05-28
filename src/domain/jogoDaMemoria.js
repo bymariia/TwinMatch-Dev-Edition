@@ -1,4 +1,3 @@
-// Objeto congelado para garantir que os status não sejam alterados de fora
 export const StatusJogo = Object.freeze({
   ESPERANDO_JOGADORES: 'ESPERANDO_JOGADORES',
   EM_ANDAMENTO: 'EM_ANDAMENTO',
@@ -6,7 +5,7 @@ export const StatusJogo = Object.freeze({
 });
 
 export class JogoDaMemoria {
-  // Campos privados (#) que guardam o estado interno do jogo de forma segura
+  // Estado interno protegido
   #listaTecnologias;
   #status;
   #jogadores;
@@ -14,8 +13,8 @@ export class JogoDaMemoria {
   #turnoAtual;
   #pontuacoes;
   #cartasViradasNoTurno;
-  #jogadoresProntos;  // RF01: Controla quem deu "Start"
-  #temposAcumulados;  // RF14: Acumula o tempo gasto por jogador
+  #jogadoresProntos;  // Controle de sincronização de prontidão
+  #temposAcumulados;  // Métricas de tempo acumulado para desempate
 
   constructor(listaTecnologias) {
     this.#listaTecnologias = listaTecnologias;
@@ -29,7 +28,8 @@ export class JogoDaMemoria {
     this.#temposAcumulados = {};
   }
 
-  // Métodos Públicos de Consulta (Getters)
+  // --- Getters & Queries ---
+
   obterStatus() {
     return this.#status;
   }
@@ -49,17 +49,21 @@ export class JogoDaMemoria {
   obterPontuacao(apelido) {
     return this.#pontuacoes[apelido] || 0;
   }
+
   obterTempos() {
     return this.#temposAcumulados;
   }
-  // RF01: Define que um jogador clicou em "Start"
+
+  // --- Regras de Negócio e Transições de Estado ---
+
+  // Registra confirmação de prontidão de um jogador
   definirPronto(apelido) {
     if (this.#jogadores.includes(apelido)) {
       this.#jogadoresProntos[apelido] = true;
     }
   }
 
-  // RF14: Registra o tempo que o jogador levou no turno
+  // Agrega o tempo de resposta do turno ao histórico do jogador
   registrarTempoTurno(apelido, segundos) {
     if (this.#jogadores.includes(apelido)) {
       this.#temposAcumulados[apelido] = (this.#temposAcumulados[apelido] || 0) + segundos;
@@ -81,7 +85,7 @@ export class JogoDaMemoria {
     }
   }
 
-  // Permite desativar o embaralhamento durante os testes para evitar comportamento aleatório
+  // Inicializa o deck de cartas (permite burlar o shuffle para rodar testes controlados)
   iniciar(embaralhar = true) {
     const todosProntos = this.#jogadores.length === 2 && this.#jogadores.every(j => this.#jogadoresProntos[j]);
 
@@ -100,7 +104,6 @@ export class JogoDaMemoria {
 
     if (embaralhar) {
       this.#cartas.sort(() => Math.random() - 0.5);
-      // Reatribui os IDs baseados na nova ordem embaralhada
       this.#cartas.forEach((carta, index) => {
         carta.id = index;
       });
@@ -109,6 +112,7 @@ export class JogoDaMemoria {
     this.#status = StatusJogo.EM_ANDAMENTO;
   }
 
+  // RF14: Avaliação de vitória com desempate matemático por tempo de processamento cognitivo
   obterVencedor() {
     if (this.#status !== StatusJogo.FINALIZADO) return null;
 
@@ -116,7 +120,6 @@ export class JogoDaMemoria {
     const pontosP1 = this.obterPontuacao(p1);
     const pontosP2 = this.obterPontuacao(p2);
 
-    // RF14: Critério de Desempate por Tempo Acumulado
     if (pontosP1 === pontosP2) {
       const tempoP1 = this.#temposAcumulados[p1] || 0;
       const tempoP2 = this.#temposAcumulados[p2] || 0;
@@ -128,6 +131,7 @@ export class JogoDaMemoria {
     return pontosP1 > pontosP2 ? p1 : p2;
   }
 
+  // Processa a revelação de cartas individuais e computação de pontuação de par correspondente
   virarCarta(apelido, indiceCarta) {
     if (this.#status !== StatusJogo.EM_ANDAMENTO) return false;
     if (this.#turnoAtual !== apelido) return false;
@@ -162,6 +166,7 @@ export class JogoDaMemoria {
     return false;
   }
 
+  // Executa o roll-back visual das cartas incompatíveis e transfere a propriedade do turno
   finalizarTurnoSeIncorreto() {
     if (this.#cartasViradasNoTurno.length !== 2) return;
 

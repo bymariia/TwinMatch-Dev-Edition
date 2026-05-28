@@ -1,3 +1,7 @@
+// ==========================================================================
+// SERVIDOR CORE // ORQUESTRADOR MULTIPLAYER (NODE.JS + SOCKET.IO)
+// ==========================================================================
+
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -14,6 +18,7 @@ const io = new Server(httpServer, {
   cors: { origin: "*" }
 });
 
+// --- MIDDLEWARES & ASSETS CONFIGURATION ---
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/src', express.static(path.join(__dirname, 'src')));
 
@@ -23,12 +28,16 @@ const listaTecnologias = [
   'GitHub', 'SQL', 'Docker', 'Linux'
 ];
 
+// --- SERVER STATE MANAGEMENT ---
 let jogo = new JogoDaMemoria(listaTecnologias);
 const mapeamentoSockets = {}; 
 let jogadoresQueremRematch = [];
-
 let timerInterval = null;
 let tempoAtual = 0; 
+
+// ==========================================================================
+// SISTEMA DE CRONOMETRAGEM (TIMERS & ENGINE CLOCK)
+// ==========================================================================
 
 function iniciarCronometro() {
   clearInterval(timerInterval);
@@ -51,10 +60,15 @@ function trocarTurnoRelogio() {
   io.emit('tick_relogio', tempoAtual);
 }
 
+// ==========================================================================
+// PROTOCOLO WEBSOCKET (SOCKET.IO EVENTS)
+// ==========================================================================
+
 io.on('connection', (socket) => {
   console.log(`[CONEXÃO] Novo cliente conectado: ${socket.id}`);
   socket.emit('estado_atualizado', sincronizarEstado());
 
+  // Registro e Autenticação de Jogador
   socket.on('jogador_entrar', (apelido) => {
     try {
       const jogadores = jogo.obterJogadores();
@@ -70,6 +84,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Confirmação de Prontidão (Matchmaking)
   socket.on('jogador_pronto', (apelido) => {
     try {
       jogo.definirPronto(apelido);
@@ -83,12 +98,12 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Gameplay: Interação com o Deck
   socket.on('virar_carta', ({ jogador, index }) => {
     if (jogo.obterTurnoAtual() !== jogador) return;
     
     const acertouPar = jogo.virarCarta(jogador, index);
 
-    // ✨ NOVIDADE: AVISA NO CHAT QUANDO FECHA O PAR!
     if (acertouPar) {
       io.emit('receber_reacao', { autor: 'SYS', mensagem: `⚡ ${jogador} fechou um par!` });
     }
@@ -111,14 +126,16 @@ io.on('connection', (socket) => {
         io.emit('estado_atualizado', sincronizarEstado());
       }, 1100);
     } else if (acertouPar && cartasViradas.length === 0 && jogo.obterStatus() === 'EM_ANDAMENTO') {
-        trocarTurnoRelogio();
+      trocarTurnoRelogio();
     }
   });
 
+  // Chat e Interações de Emojis
   socket.on('enviar_reacao', ({ autor, mensagem }) => {
-    io.emit('receber_reacao', { autor, mensagem }); // ✨ CORREÇÃO DE DIGITAÇÃO AQUI
+    io.emit('receber_reacao', { autor, mensagem });
   });
 
+  // Abandono Voluntário (Desistência)
   socket.on('abandonar_partida', (apelido) => {
     const jogadores = jogo.obterJogadores();
     const vencedorPorWO = jogadores.find(j => j !== apelido);
@@ -126,11 +143,13 @@ io.on('connection', (socket) => {
     resetarServidor();
   });
 
+  // Tratamento de Desconexões de Rede
   socket.on('disconnect', () => {
     const apelido = mapeamentoSockets[socket.id];
     if (apelido) {
       console.log(`[DESCONEXÃO] ${apelido} saiu.`);
       delete mapeamentoSockets[socket.id];
+      
       if (jogo.obterStatus() !== 'EM_ANDAMENTO') {
         resetarServidor();
         io.emit('estado_atualizado', sincronizarEstado());
@@ -145,42 +164,33 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 🔄 NOVO: GERENCIAR SOLICITAÇÃO DE REVANCHE DIRECTA
+  // Orquestração de Revanche Direta (Rematch Pipeline)
   socket.on('solicitar_rematch', (apelido) => {
-    // Evita adicionar o mesmo jogador duas vezes no array se ele clicar repetido
     if (!jogadoresQueremRematch.includes(apelido)) {
       jogadoresQueremRematch.push(apelido);
       io.emit('receber_reacao', { autor: 'SYS', mensagem: `🔄 ${apelido} quer revanche!` });
     }
 
-    // Se os dois jogadores aceitaram o rematch
     if (jogadoresQueremRematch.length === 2) {
-      // 1. Guardamos quem são os jogadores atuais antes de resetar a classe
       const jogadoresAtuais = jogo.obterJogadores();
-
-      // 2. Criamos uma nova instância limpa do jogo
       jogo = new JogoDaMemoria(listaTecnologias);
 
-      // 3. Inserimos os mesmos jogadores de volta na nova instância
       jogadoresAtuais.forEach(j => {
         jogo.adicionarJogador(j);
-        jogo.definirPronto(j); // Já coloca os dois como Ready automaticamente
+        jogo.definirPronto(j);
       });
 
-      // 4. Forçamos o início do motor do jogo
       jogo.iniciar();
-
-      // 5. Reiniciamos os cronômetros do servidor
       iniciarCronometro();
-
-      // 6. Limpamos a lista de rematch para a próxima partida
       jogadoresQueremRematch = [];
-
-      // 7. Disparamos o estado atualizado para o app.js fechar o modal e redesenhar o grid
       io.emit('estado_atualizado', sincronizarEstado());
     }
   });
 });
+
+// ==========================================================================
+// UTILITÁRIOS E FUNÇÕES AUXILIARES DE ESTADO
+// ==========================================================================
 
 function sincronizarEstado() {
   return {
@@ -189,7 +199,6 @@ function sincronizarEstado() {
     turnoAtual: jogo.obterTurnoAtual(),
     cartas: jogo.obterCartas(),
     vencedor: jogo.obterStatus() === 'FINALIZADO' ? jogo.obterVencedor() : null,
-    // ✨ NOVIDADE: AGORA O SERVIDOR MANDA OS TEMPOS PARA O FRONTEND
     tempos: typeof jogo.obterTempos === 'function' ? jogo.obterTempos() : {},
     pontuacoes: jogo.obterJogadores().reduce((acc, j) => {
       acc[j] = jogo.obterPontuacao(j);
@@ -202,9 +211,12 @@ function resetarServidor() {
   pararCronometro();
   jogo = new JogoDaMemoria(listaTecnologias);
   jogadoresQueremRematch = [];
-  for (const prop in mapeamentoSockets) delete mapeamentoSockets[prop];
+  for (const prop in mapeamentoSockets) {
+    delete mapeamentoSockets[prop];
+  }
 }
 
+// --- BOOTSTRAP APPLICATION ---
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
   console.log(`🚀 Servidor multiplayer online na porta http://localhost:${PORT}`);
