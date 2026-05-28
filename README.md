@@ -40,10 +40,4 @@ Toda a lógica central do jogo (`JogoDaMemoria.js`) foi desenvolvida utilizando 
 
 ---
 
-## ⚙️ Como rodar o projeto localmente
-
-Se você quiser testar ou modificar o jogo na sua própria máquina, siga os passos abaixo:
-
-1. Clone este repositório:
-   ```bash
-   git clone [https://github.com/SEU_USUARIO/TwinMatch-Dev-Edition.git](https://github.com/SEU_USUARIO/TwinMatch-Dev-Edition.git)
+🎮 **[JOGUE AGORA ONLINE](https://twinmatch-devedition.onrender.com)** 🎮
